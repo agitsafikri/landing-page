@@ -1,1 +1,1 @@
-git submodule add https://github.com/Taman-Bermain/assets-fe.git assets
+git submodule add https://github.com/Taman-Bermain/assets-fe.git app/assets
