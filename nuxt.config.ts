@@ -7,5 +7,6 @@ export default defineNuxtConfig({
     public: {
       api_url: process.env.VITE_APP_API_URL,
     },
-  }
+  },
+  css: ['@/assets/styles/index.scss'],
 })
