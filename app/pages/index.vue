@@ -3,8 +3,10 @@ import ProductDetail from "~/components/productDetail.vue";
 </script>
 
 <template>
-  <div class="client-layout">
+  <NuxtLayout name="client-layouts">
     <ProductDetail />
     <ProductOption />
-  </div>
+    <Recipient />
+    <PaymentMethod />
+  </NuxtLayout>
 </template>

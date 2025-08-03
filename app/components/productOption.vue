@@ -20,22 +20,25 @@ const productOptions = ref([
 
 <template>
   <section id="product-option">
-    <h3 class="text-bold">Pilihan Produk</h3>
+    <p class="title ff-open-sans">Pilihan Produk</p>
     <div id="product-option-list">
       <div
         class="product-option-item"
         v-for="option in productOptions"
         :key="option.id"
       >
-        <input
-          type="radio"
-          name="product-option"
-          :id="'option-' + option.id"
-          :value="option.id"
-        />
-        <label :for="'option-' + option.id"
-          >{{ option.text }} (Rp. {{ option.price }})</label
-        >
+        <div class="product-option-item">
+          <input
+            type="radio"
+            name="product-option"
+            :id="'option-' + option.id"
+            :value="option.id"
+          />
+          <label :for="'option-' + option.id">
+            <span class="text">{{ option.text }}</span>
+            <span class="price">Rp. {{ option.price }}</span></label
+          >
+        </div>
       </div>
     </div>
   </section>
