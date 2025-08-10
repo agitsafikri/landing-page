@@ -1,4 +1,7 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import codIcon from "~/assets/images/cod-icon.png";
+import bankTransferIcon from "~/assets/images/bank-transfer-icon.png";
+</script>
 
 <template>
   <section id="recipient">
@@ -58,5 +61,22 @@
         />
       </div>
     </form>
+    <div id="payment-method">
+      <p class="title ff-open-sans">Metode Pembayaran</p>
+      <div id="payment-method-list">
+        <div class="payment-method-item">
+          <label for="payment-method-1">
+            <img :src="codIcon" /> (Bayar di Tempat)</label
+          >
+          <input type="radio" name="payment-method" id="payment-method-1" />
+        </div>
+        <div class="payment-method-item">
+          <label for="payment-method-2">
+            <img :src="bankTransferIcon" /> Bank Transfer</label
+          >
+          <input type="radio" name="payment-method" id="payment-method-2" />
+        </div>
+      </div>
+    </div>
   </section>
 </template>

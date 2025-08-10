@@ -1,12 +1,12 @@
-<script setup lang="ts">
-import ProductDetail from "~/components/productDetail.vue";
-</script>
+<script setup lang="ts"></script>
 
 <template>
   <NuxtLayout name="client-layouts">
     <ProductDetail />
     <ProductOption />
     <Recipient />
-    <PaymentMethod />
+    <ProductSale />
+    <Action />
+    <ProductReview />
   </NuxtLayout>
 </template>
