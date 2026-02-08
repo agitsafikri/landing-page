@@ -1,5 +1,5 @@
 <template>
-  <section id="product-not-found">
+  <section class="product-not-found">
     <div class="title">
       <p>Maaf,</p>
       <p>Kami tidak menemukan produk</p>

@@ -25,7 +25,7 @@ const reviews = ref([
 </script>
 
 <template>
-  <section id="product-review">
+  <section class="product-review">
     <p class="title ff-open-sans">Ulasan Produk</p>
     <div class="reviews">
       <div class="review" v-for="review in reviews" :key="review.id">

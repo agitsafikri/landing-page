@@ -4,9 +4,9 @@ import bankTransferIcon from "~/assets/images/bank-transfer-icon.png";
 </script>
 
 <template>
-  <section id="recipient">
+  <section class="recipient">
     <p class="title ff-open-sans">Data Penerima</p>
-    <form id="receipent-form">
+    <form class="receipent-form">
       <div class="input-group">
         <label for="name">Nama Lengkap</label>
         <div class="field">
@@ -61,9 +61,9 @@ import bankTransferIcon from "~/assets/images/bank-transfer-icon.png";
         />
       </div>
     </form>
-    <div id="payment-method">
+    <div class="payment-method">
       <p class="title ff-open-sans">Metode Pembayaran</p>
-      <div id="payment-method-list">
+      <div class="payment-method-list">
         <div class="payment-method-item">
           <label for="payment-method-1">
             <img :src="codIcon" /> (Bayar di Tempat)</label

@@ -14,18 +14,18 @@ const dummyProductFeature = [
 <template>
   <CarouselCustom
     :images="[dummyImage, dummyImage, dummyImage]"
-    id="product-img"
+    class="product-img"
   />
-  <section id="product-detail">
-    <h2 id="product-price" class="ff-poppins">Rp. 100.000</h2>
-    <h3 id="product-name" class="ff-open-sans">Product Name</h3>
-    <div id="product-feature" class="border-top-1-solid-primary">
+  <section class="product-detail">
+    <h2 class="ff-poppins product-price">Rp. 100.000</h2>
+    <h3 class="ff-open-sans product-name">Product Name</h3>
+    <div class="border-top-1-solid-primary product-feature">
       <p class="title ff-open-sans">Yang Anda Dapatkan</p>
       <ul>
         <li
-          v-for="feature in dummyProductFeature"
-          :key="feature"
-          :id="feature"
+          v-for="(feature, index) in dummyProductFeature"
+          :key="'feature-' + index"
+          :id="'feature-' + index"
           class="ff-open-sans"
         >
           {{ feature }}

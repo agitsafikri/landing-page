@@ -19,9 +19,9 @@ const productOptions = ref([
 </script>
 
 <template>
-  <section id="product-option">
+  <section class="product-option">
     <p class="title ff-open-sans">Pilihan Produk</p>
-    <div id="product-option-list">
+    <div class="product-option-list">
       <div
         class="product-option-item"
         v-for="option in productOptions"

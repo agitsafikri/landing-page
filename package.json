@@ -13,10 +13,13 @@
     "@pinia/nuxt": "^0.11.1",
     "axios": "^1.10.0",
     "env": "^0.0.2",
+    "form-data": "^4.0.5",
+    "maska": "^3.2.0",
     "nuxt": "^4.0.0",
     "pinia": "^3.0.3",
     "sass": "^1.89.2",
     "vue": "^3.5.17",
+    "vue-material-design-icons": "^5.3.1",
     "vue-router": "^4.5.1",
     "vue3-carousel": "^0.16.0"
   },

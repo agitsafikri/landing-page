@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from "axios";
 
 const generateInstance = (baseURL: string | undefined) => {
   const options = {
@@ -7,8 +7,8 @@ const generateInstance = (baseURL: string | undefined) => {
     maxContentLength: Infinity,
     maxBodyLength: Infinity,
     headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
+      "Content-Type": "application/json",
+      Accept: "application/json",
     },
   };
   const http = axios.create(options);
@@ -17,11 +17,12 @@ const generateInstance = (baseURL: string | undefined) => {
 
 export default class HttpClient {
   public static getInstance(envString: string) {
+    const config = useRuntimeConfig();
     switch (envString) {
-      case 'api':
-        return generateInstance(process.env.VITE_APP_API_URL);
+      case "api_url":
+        return generateInstance(config.public.api_url);
       default:
-        return generateInstance('');
+        return generateInstance("");
     }
   }
 }

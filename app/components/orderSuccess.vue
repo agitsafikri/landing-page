@@ -3,7 +3,7 @@ const productName = ref("Product Name");
 </script>
 
 <template>
-  <section id="order-success">
+  <section class="order-success">
     <div class="title">
       <p>Terima kasih</p>
       <p>sudah melakukan order</p>

@@ -42,7 +42,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section id="product-sale">
+  <section class="product-sale">
     <div class="countdown">
       <div class="hours">
         <p class="counter">{{ countdown.hours }}</p>
