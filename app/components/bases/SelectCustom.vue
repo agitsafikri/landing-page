@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import menuDown from "vue-material-design-icons/MenuDown.vue";
 import menuUp from "vue-material-design-icons/MenuUp.vue";
+import InputCustom from "./InputCustom.vue";
 interface listInterface {
   name: string;
   value: string | number | boolean;
