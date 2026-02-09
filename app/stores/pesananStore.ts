@@ -17,11 +17,10 @@ export const usePesananStore = defineStore("pesananStore", {
           `/${prefix}/create`,
           data,
         );
-        if (response.success) {
-          this.isSubmitted = true;
-          this.phoneNumber = data.phoneNumber;
-          this.message = data.message;
-        }
+        this.isSubmitted = true;
+        this.phoneNumber = response.data.data.phoneNumber;
+        this.message = response.data.data.message;
+
         return response.data;
       } catch (error: any) {
         errorHelper(error);

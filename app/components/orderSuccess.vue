@@ -17,7 +17,7 @@ onMounted(() => {
     redirectTimer.value--;
     if (redirectTimer.value === 0) {
       clearInterval(timer);
-      // openWhatsapp();
+      openWhatsapp();
     }
   }, 1000);
 });
