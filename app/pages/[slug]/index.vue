@@ -1,19 +1,20 @@
 <script setup lang="ts">
-import CarouselCustom from "~/components/Bases/carouselCustom.vue";
+import CarouselCustom from "~/components/bases/carouselCustom.vue";
 import { useProdukStore } from "~/stores/produkStore";
 import Check from "vue-material-design-icons/Check.vue";
 import codIcon from "~/assets/images/cod-icon.png";
 import bankTransferIcon from "~/assets/images/bank-transfer-icon.png";
-import InputCustom from "~/components/Bases/InputCustom.vue";
-import TextAreaCustom from "~/components/Bases/TextAreaCustom.vue";
-import SelectCustom from "~/components/Bases/SelectCustom.vue";
-import ButtonCustom from "~/components/Bases/ButtonCustom.vue";
+import InputCustom from "~/components/bases/InputCustom.vue";
+import TextAreaCustom from "~/components/bases/TextAreaCustom.vue";
+import SelectCustom from "~/components/bases/SelectCustom.vue";
+import ButtonCustom from "~/components/bases/ButtonCustom.vue";
 import { validateForm } from "~/functions/formHelper";
 
 const route = useRoute();
 const slug = route.params.slug as string;
 const produkStore = useProdukStore();
 const locationStore = useLocationStore();
+const pesananStore = usePesananStore();
 const isCOD = ref(false);
 const isBankTransfer = ref(false);
 const isCountdown = ref(false);
@@ -36,18 +37,18 @@ const form = ref({
   idKota: null,
   idKecamatan: null,
   metodePembayaran: "",
-  source: "",
+  source: "FORM",
 });
 const info = ref({
-  namaLengkap: { type: "", message: "" },
-  nomorWhatsapp: { type: "", message: "" },
-  alamat: { type: "", message: "" },
-  idProvinsi: { type: "", message: "" },
-  idKota: { type: "", message: "" },
-  idKecamatan: { type: "", message: "" },
-  idProduk: { type: "", message: "" },
-  idAtributProduk: { type: "", message: "" },
-  metodePembayaran: { type: "", message: "" },
+  namaLengkap: { type: "info", message: "" },
+  nomorWhatsapp: { type: "info", message: "" },
+  alamat: { type: "info", message: "" },
+  idProvinsi: { type: "info", message: "" },
+  idKota: { type: "info", message: "" },
+  idKecamatan: { type: "info", message: "" },
+  idProduk: { type: "info", message: "" },
+  idAtributProduk: { type: "info", message: "" },
+  metodePembayaran: { type: "info", message: "" },
 });
 
 const startCountdown = () => {
@@ -102,6 +103,8 @@ const mappingData = () => {
   isBankTransfer.value = item.metodePembayaran.includes("Bank Transfer");
 
   if (isCountdown.value) startCountdown();
+
+  form.value.idProduk = item.id;
 };
 
 const getProduk = async () => {
@@ -177,6 +180,14 @@ const handleSelectKecamatan = async (selected: any) => {
   form.value.idKecamatan = selected.value;
 };
 
+const handleSelectOption = (selected: any) => {
+  form.value.idAtributProduk = selected.id;
+};
+
+const handleSelectPaymentMethod = (selected: any) => {
+  form.value.metodePembayaran = selected;
+};
+
 const validateData = () => {
   let err = 0;
   const validation = {
@@ -209,7 +220,11 @@ const validateData = () => {
       required: true,
     },
     idAtributProduk: {
-      label: "Variasi",
+      label: "Pilihan Produk",
+      required: true,
+    },
+    metodePembayaran: {
+      label: "Metode Pembayaran",
       required: true,
     },
   };
@@ -218,7 +233,7 @@ const validateData = () => {
   return err;
 };
 
-const submitData = () => {
+const submitData = async () => {
   const error = validateData();
   if (error > 0) {
     return;
@@ -230,9 +245,10 @@ const submitData = () => {
     payload.nomorWhatsapp = payload.nomorWhatsapp.replace(/\D/g, "");
   }
 
-  console.log(payload);
-
-  // const res = await pesananStore.onUpdate(payload);
+  const res = await pesananStore.onStore(payload);
+  if (res.success) {
+    navigateTo(`/${route.params.slug}/success`);
+  }
   loading.value = false;
 };
 
@@ -287,6 +303,7 @@ onMounted(() => {
           class="product-option-item"
           v-for="option in produkStore.item.atributProduk"
           :key="option.id"
+          @click="handleSelectOption(option)"
         >
           <div class="product-option-item">
             <input
@@ -302,6 +319,9 @@ onMounted(() => {
           </div>
         </div>
       </div>
+      <span class="message danger fz-em-07 m-4-top">{{
+        info.idAtributProduk.message
+      }}</span>
     </section>
     <section class="recipient">
       <p class="title ff-open-sans">Data Penerima</p>
@@ -314,6 +334,8 @@ onMounted(() => {
             required
             v-model="form.namaLengkap"
             placeholder="Nama Lengkap"
+            :message-type="info.namaLengkap.type"
+            :message="info.namaLengkap.message"
           />
           <InputCustom
             label="Nomor Whatsapp"
@@ -323,6 +345,8 @@ onMounted(() => {
             v-model="form.nomorWhatsapp"
             mask="+62 #### #### ####"
             placeholder="+62 xxxx xxxx xxxx"
+            :message-type="info.nomorWhatsapp.type"
+            :message="info.nomorWhatsapp.message"
           />
           <TextAreaCustom
             label="Alamat Lengkap"
@@ -331,6 +355,8 @@ onMounted(() => {
             required
             v-model="form.alamat"
             placeholder="Alamat Lengkap"
+            :message-type="info.alamat.type"
+            :message="info.alamat.message"
           />
           <SelectCustom
             label="Provinsi"
@@ -342,6 +368,8 @@ onMounted(() => {
             :ro-value="roValueProvinsi"
             :list="locationStore.provinces"
             @select="handleSelectProvinsi"
+            :message-type="info.idProvinsi.type"
+            :message="info.idProvinsi.message"
           />
           <SelectCustom
             label="Kota"
@@ -354,6 +382,8 @@ onMounted(() => {
             :list="locationStore.cities"
             :disabled="!form.idProvinsi"
             @select="handleSelectKota"
+            :message-type="info.idKota.type"
+            :message="info.idKota.message"
           />
           <SelectCustom
             label="Kecamatan"
@@ -366,6 +396,8 @@ onMounted(() => {
             :list="locationStore.districts"
             :disabled="!form.idKota"
             @select="handleSelectKecamatan"
+            :message-type="info.idKecamatan.type"
+            :message="info.idKecamatan.message"
           />
         </div>
       </div>
@@ -376,15 +408,28 @@ onMounted(() => {
             <label for="payment-method-1">
               <img :src="codIcon" /> (Bayar di Tempat)</label
             >
-            <input type="radio" name="payment-method" id="payment-method-1" />
+            <input
+              type="radio"
+              name="payment-method"
+              id="payment-method-1"
+              @click="handleSelectPaymentMethod('COD')"
+            />
           </div>
           <div class="payment-method-item" v-if="isBankTransfer">
             <label for="payment-method-2">
               <img :src="bankTransferIcon" /> Bank Transfer</label
             >
-            <input type="radio" name="payment-method" id="payment-method-2" />
+            <input
+              type="radio"
+              name="payment-method"
+              id="payment-method-2"
+              @click="handleSelectPaymentMethod('Bank Transfer')"
+            />
           </div>
         </div>
+        <span class="message danger fz-em-07 m-4-top">{{
+          info.metodePembayaran.message
+        }}</span>
       </div>
     </section>
     <section class="product-sale">

@@ -15,7 +15,6 @@ export const useProdukStore = defineStore("produkStore", {
           urlCheckout,
         });
         this.item = response.data.data;
-        alertStore.setAlert(response.data.message, "success");
         return response.data;
       } catch (err: any) {
         alertStore.setAlert(err.response?.data?.message, "danger");
