@@ -1,14 +1,10 @@
 <script setup lang="ts">
-import CarouselCustom from "~/components/Bases/carouselCustom.vue";
-import { useProdukStore } from "~/stores/produkStore";
 import Check from "vue-material-design-icons/Check.vue";
-import codIcon from "~/assets/images/cod-icon.png";
 import bankTransferIcon from "~/assets/images/bank-transfer-icon.png";
-import InputCustom from "~/components/Bases/InputCustom.vue";
-import TextAreaCustom from "~/components/Bases/TextAreaCustom.vue";
-import SelectCustom from "~/components/Bases/SelectCustom.vue";
-import ButtonCustom from "~/components/Bases/ButtonCustom.vue";
+import codIcon from "~/assets/images/cod-icon.png";
+import { setDelimiter, setMoneyDelimiter } from "~/functions/delimiter";
 import { validateForm } from "~/functions/formHelper";
+import { useProdukStore } from "~/stores/produkStore";
 
 const route = useRoute();
 const slug = route.params.slug as string;
@@ -264,7 +260,7 @@ onMounted(() => {
 
 <template>
   <NuxtLayout name="client-layouts">
-    <CarouselCustom
+    <BasesCarouselCustom
       v-if="
         produkStore.item.gambarProduk &&
         produkStore.item.gambarProduk.length > 0 &&
@@ -281,7 +277,7 @@ onMounted(() => {
           produkStore.item.atributProduk.length > 0
         "
       >
-        Rp. {{ produkStore.item.atributProduk[0].harga }}
+        {{ setMoneyDelimiter(produkStore.item.atributProduk[0].harga) }}
       </h2>
       <h3 class="ff-open-sans product-name">
         {{ produkStore.item.namaProduk }}
@@ -318,7 +314,9 @@ onMounted(() => {
             />
             <label :for="'option-' + option.id">
               <span class="text">{{ option.deskripsi }}</span>
-              <span class="price">Rp. {{ option.harga }}</span></label
+              <span class="price">
+                {{ setMoneyDelimiter(option.harga) }}</span
+              ></label
             >
           </div>
         </div>
@@ -331,7 +329,7 @@ onMounted(() => {
       <p class="title ff-open-sans">Data Penerima</p>
       <div class="receipent-form">
         <div class="receipent-form-item">
-          <InputCustom
+          <BasesInputCustom
             label="Nama Lengkap"
             field-id="nama-lengkap"
             field-name="nama-lengkap"
@@ -341,7 +339,7 @@ onMounted(() => {
             :message-type="info.namaLengkap.type"
             :message="info.namaLengkap.message"
           />
-          <InputCustom
+          <BasesInputCustom
             label="Nomor Whatsapp"
             field-id="nomor-whatsapp"
             field-name="nomor-whatsapp"
@@ -352,7 +350,7 @@ onMounted(() => {
             :message-type="info.nomorWhatsapp.type"
             :message="info.nomorWhatsapp.message"
           />
-          <TextAreaCustom
+          <BasesTextAreaCustom
             label="Alamat Lengkap"
             field-id="alamat-lengkap"
             field-name="alamat-lengkap"
@@ -362,7 +360,7 @@ onMounted(() => {
             :message-type="info.alamat.type"
             :message="info.alamat.message"
           />
-          <SelectCustom
+          <BasesSelectCustom
             label="Provinsi"
             field-id="provinsi"
             field-name="provinsi"
@@ -375,7 +373,7 @@ onMounted(() => {
             :message-type="info.idProvinsi.type"
             :message="info.idProvinsi.message"
           />
-          <SelectCustom
+          <BasesSelectCustom
             label="Kota"
             field-id="kota"
             field-name="kota"
@@ -389,7 +387,7 @@ onMounted(() => {
             :message-type="info.idKota.type"
             :message="info.idKota.message"
           />
-          <SelectCustom
+          <BasesSelectCustom
             label="Kecamatan"
             field-id="kecamatan"
             field-name="kecamatan"
@@ -452,7 +450,7 @@ onMounted(() => {
         </div>
       </div>
       <div class="flash-sale" v-if="isFlashSale">
-        <p class="quantity">{{ flashSaleConfig.config.stok }}</p>
+        <p class="quantity">{{ setDelimiter(flashSaleConfig.config.stok) }}</p>
         <p class="label">{{ flashSaleConfig.config.pesan }}</p>
       </div>
       <div class="guarantee" v-if="isPesanTambahan">
@@ -460,12 +458,12 @@ onMounted(() => {
       </div>
     </section>
     <section class="action">
-      <ButtonCustom
+      <BasesButtonCustom
         class="action-btn btn-primary w-p-100 m-8-bottom"
         @click="submitData"
       >
         {{ produkStore.item.narasiTombol || "Beli Sekarang" }}
-      </ButtonCustom>
+      </BasesButtonCustom>
       <p class="syarat-ketentuan">
         Dengan melanjutkan pembayaran, kamu menyetujui
         <a href="#">S&K</a>

@@ -1,53 +1,60 @@
-export function setDelimiter(value: any, delimiter: any = '.') {
-  if (isNaN(value) || value === null) return '';
+export function setDelimiter(value: any, delimiter: any = ".") {
+  if (isNaN(value) || value === null) return "";
 
   return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, delimiter);
 }
 export function removeDelimiter(
   value: any,
-  delimiter: any = '.',
-  decimal: any = ','
+  delimiter: any = ".",
+  decimal: any = ",",
 ) {
-  if (isNaN(value) || value === null) return '';
+  if (isNaN(value) || value === null) return "";
 
-  value = value.toString().replace(delimiter, '');
-  return Number(value.replace(decimal, '.'));
+  value = value.toString().replace(delimiter, "");
+  return Number(value.replace(decimal, "."));
 }
 
 export function setMoneyDelimiter(
   value: any,
-  delimiter: any = '.',
-  decimal: any = ',',
+  delimiter: any = ".",
+  decimal: any = ",",
   precision: any = 2,
   round: any = true,
-  currency: any = 'Rp'
+  currency: any = "Rp",
 ) {
-  if (isNaN(value) || value === null) return '';
-  let v = value.toFixed(precision);
-  if (round) v = Math.round(v * 100) / 100;
+  if (isNaN(value) || value === null) return "";
+  let v = Number(value);
+  if (round) {
+    const factor = Math.pow(10, precision);
+    v = Math.round(v * factor) / factor;
+  }
+  const parts = v.toFixed(precision).split(".");
   return (
     currency +
-    ' ' +
-    v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, delimiter) +
-    decimal +
-    v.toString().slice(-precision)
+    " " +
+    parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, delimiter) +
+    (parts[1] ? decimal + parts[1] : "")
   );
 }
 export function removeMoneyDelimiter(
   value: any,
-  delimiter: any = '.',
-  decimal: any = ',',
+  delimiter: any = ".",
+  decimal: any = ",",
   precision: any = 2,
   round: any = true,
-  currency: any = 'Rp'
+  currency: any = "Rp",
 ) {
-  let v = value.toFixed(precision);
-  if (round) v = Math.round(v * 100) / 100;
+  if (isNaN(value) || value === null) return "";
+  let v = Number(value);
+  if (round) {
+    const factor = Math.pow(10, precision);
+    v = Math.round(v * factor) / factor;
+  }
+  const parts = v.toFixed(precision).split(".");
   return (
     currency +
-    ' ' +
-    v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, delimiter) +
-    decimal +
-    v.slice(-precision)
+    " " +
+    parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, delimiter) +
+    (parts[1] ? decimal + parts[1] : "")
   );
 }
