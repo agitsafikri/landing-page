@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import CarouselCustom from "~/components/bases/carouselCustom.vue";
+import CarouselCustom from "~/components/Bases/carouselCustom.vue";
 import { useProdukStore } from "~/stores/produkStore";
 import Check from "vue-material-design-icons/Check.vue";
 import codIcon from "~/assets/images/cod-icon.png";
 import bankTransferIcon from "~/assets/images/bank-transfer-icon.png";
-import InputCustom from "~/components/bases/InputCustom.vue";
-import TextAreaCustom from "~/components/bases/TextAreaCustom.vue";
-import SelectCustom from "~/components/bases/SelectCustom.vue";
-import ButtonCustom from "~/components/bases/ButtonCustom.vue";
+import InputCustom from "~/components/Bases/InputCustom.vue";
+import TextAreaCustom from "~/components/Bases/TextAreaCustom.vue";
+import SelectCustom from "~/components/Bases/SelectCustom.vue";
+import ButtonCustom from "~/components/Bases/ButtonCustom.vue";
 import { validateForm } from "~/functions/formHelper";
 
 const route = useRoute();
@@ -15,6 +15,7 @@ const slug = route.params.slug as string;
 const produkStore = useProdukStore();
 const locationStore = useLocationStore();
 const pesananStore = usePesananStore();
+const alertStore = useAlertStore();
 const isCOD = ref(false);
 const isBankTransfer = ref(false);
 const isCountdown = ref(false);
@@ -236,7 +237,10 @@ const validateData = () => {
 const submitData = async () => {
   const error = validateData();
   if (error > 0) {
-    return;
+    alertStore.setAlert(
+      "Terdapat beberapa kesalahan pada form. Silakan periksa kembali.",
+      "danger",
+    );
   }
 
   loading.value = true;
