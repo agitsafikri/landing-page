@@ -12,6 +12,8 @@ const produkStore = useProdukStore();
 const locationStore = useLocationStore();
 const pesananStore = usePesananStore();
 const alertStore = useAlertStore();
+const config = useRuntimeConfig();
+const isAbandonSubmitted = ref(false);
 const isCOD = ref(false);
 const isBankTransfer = ref(false);
 const isCountdown = ref(false);
@@ -237,6 +239,7 @@ const submitData = async () => {
       "Terdapat beberapa kesalahan pada form. Silakan periksa kembali.",
       "danger",
     );
+    return;
   }
 
   loading.value = true;
@@ -252,9 +255,44 @@ const submitData = async () => {
   loading.value = false;
 };
 
+const handleAbandon = () => {
+  if (pesananStore.isSubmitted || isAbandonSubmitted.value) return;
+  isAbandonSubmitted.value = true;
+
+  const payload = { ...form.value, source: "ABANDON" };
+  if (payload.nomorWhatsapp) {
+    payload.nomorWhatsapp = payload.nomorWhatsapp.replace(/\D/g, "");
+  }
+
+  fetch(`${config.public.api_url}order/create`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+    keepalive: true,
+  });
+};
+
+const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
+  if (!pesananStore.isSubmitted) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+};
+
 onMounted(() => {
   getProduk();
   locationStore.onIndexProvince();
+
+  window.addEventListener("beforeunload", beforeUnloadHandler);
+  window.addEventListener("pagehide", handleAbandon);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("beforeunload", beforeUnloadHandler);
+  window.removeEventListener("pagehide", handleAbandon);
 });
 </script>
 
