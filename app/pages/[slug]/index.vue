@@ -104,6 +104,14 @@ const mappingData = () => {
   if (isCountdown.value) startCountdown();
 
   form.value.idProduk = item.id;
+
+  if (item.atributProduk && item.atributProduk.length > 0) {
+    form.value.idAtributProduk = item.atributProduk[0].id;
+  }
+
+  if (item.metodePembayaran && item.metodePembayaran.length > 0) {
+    form.value.metodePembayaran = item.metodePembayaran[0];
+  }
 };
 
 const getProduk = async () => {
@@ -349,6 +357,7 @@ onBeforeUnmount(() => {
               name="product-option"
               :id="'option-' + option.id"
               :value="option.id"
+              v-model="form.idAtributProduk"
             />
             <label :for="'option-' + option.id">
               <span class="text">{{ option.deskripsi }}</span>
@@ -446,24 +455,27 @@ onBeforeUnmount(() => {
         <div class="payment-method-list" v-if="isCOD || isBankTransfer">
           <div class="payment-method-item" v-if="isCOD">
             <label for="payment-method-1">
-              <img :src="codIcon" /> (Bayar di Tempat)</label
+              <img :src="codIcon" alt="icon-cod" /> (Bayar di Tempat)</label
             >
             <input
               type="radio"
               name="payment-method"
               id="payment-method-1"
-              @click="handleSelectPaymentMethod('COD')"
+              value="COD"
+              v-model="form.metodePembayaran"
             />
           </div>
           <div class="payment-method-item" v-if="isBankTransfer">
             <label for="payment-method-2">
-              <img :src="bankTransferIcon" /> Bank Transfer</label
+              <img :src="bankTransferIcon" alt="icon-bank-transfer" /> Bank
+              Transfer</label
             >
             <input
               type="radio"
               name="payment-method"
               id="payment-method-2"
-              @click="handleSelectPaymentMethod('Bank Transfer')"
+              value="Bank Transfer"
+              v-model="form.metodePembayaran"
             />
           </div>
         </div>
@@ -536,7 +548,6 @@ onBeforeUnmount(() => {
             <div class="reviewer-info">
               <p class="name ff-open-sans">
                 {{ testimoni.nama }}
-                <!-- <span v-for="n in testimoni.rating" :key="n">⭐</span> -->
               </p>
               <div class="rating"></div>
             </div>
