@@ -18,7 +18,7 @@ export function setMoneyDelimiter(
   value: any,
   delimiter: any = ".",
   decimal: any = ",",
-  precision: any = 2,
+  precision: any = 0,
   round: any = true,
   currency: any = "Rp",
 ) {
@@ -40,7 +40,7 @@ export function removeMoneyDelimiter(
   value: any,
   delimiter: any = ".",
   decimal: any = ",",
-  precision: any = 2,
+  precision: any = 0,
   round: any = true,
   currency: any = "Rp",
 ) {
