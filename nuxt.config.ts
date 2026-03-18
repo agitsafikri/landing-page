@@ -19,4 +19,14 @@ export default defineNuxtConfig({
   },
   ssr: false,
   css: ["@/styles/index.scss"],
+  experimental: {
+    inlineSSRStyles: false
+  },
+  app: {
+    head: {
+      htmlAttrs: {
+        lang: 'id',
+      },
+    },
+  },
 });

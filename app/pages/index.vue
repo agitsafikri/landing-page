@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import logoFull from "~/assets/images/logo-full.png";
+import logoFull from "~/assets/images/logo-full.svg";
 useHead({
   title: "Saktiform",
   meta: [

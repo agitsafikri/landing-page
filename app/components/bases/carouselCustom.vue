@@ -19,8 +19,19 @@ const config = {
 
 <template>
   <Carousel v-bind="config">
-    <Slide v-for="image in props.images" :key="image">
-      <img :src="image" />
+    <Slide
+      v-for="(image, index) in props.images"
+      :key="image"
+    >
+      <img
+        :src="image"
+        width="800"
+        height="800"
+        :loading="index === 0 ? 'eager' : 'lazy'"
+        :fetchpriority="index === 0 ? 'high' : 'auto'"
+        alt="product image"
+        class="carousel-image"
+      />
     </Slide>
 
     <template #addons>
@@ -29,3 +40,11 @@ const config = {
     </template>
   </Carousel>
 </template>
+
+<style scoped>
+.carousel-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+</style>

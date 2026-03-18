@@ -101,7 +101,9 @@ const mappingData = () => {
   isCOD.value = item.metodePembayaran.includes("COD");
   isBankTransfer.value = item.metodePembayaran.includes("Bank Transfer");
 
-  if (isCountdown.value) startCountdown();
+  if (process.client && isCountdown.value) {
+  startCountdown();
+}
 
   form.value.idProduk = item.id;
 
@@ -112,56 +114,6 @@ const mappingData = () => {
   if (item.metodePembayaran && item.metodePembayaran.length > 0) {
     form.value.metodePembayaran = item.metodePembayaran[0];
   }
-};
-
-const getProduk = async () => {
-  await produkStore.onCheckout(slug);
-
-  mappingData();
-
-  useHead({
-    script: [
-      {
-        innerHTML: `
-          !function(f,b,e,v,n,t,s)
-          {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-          n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-          if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-          n.queue=[];t=b.createElement(e);t.async=!0;
-          t.src=v;s=b.getElementsByTagName(e)[0];
-          s.parentNode.insertBefore(t,s)}(window, document,'script',
-          'https://connect.facebook.net/en_US/fbevents.js');
-          fbq('init', '${produkStore.item.idFacebookPixelId}');
-          fbq('track', 'PageView');
-        `,
-        type: "text/javascript",
-      },
-      {
-        src: `https://www.googletagmanager.com/gtag/js?id=${produkStore.item.idGoogleGtmId}`,
-        async: true,
-      },
-      {
-        innerHTML: `
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', '${produkStore.item.idGoogleGtmId}');
-        `,
-        type: "text/javascript",
-      },
-      {
-        innerHTML: produkStore.item.embededCheckoutScript,
-        type: "text/javascript",
-      },
-    ],
-    noscript: [
-      {
-        innerHTML: `<img height="1" width="1" style="display:none"
-          src="https://www.facebook.com/tr?id=${produkStore.item.idFacebookPixelId}&ev=PageView&noscript=1"
-          />`,
-      },
-    ],
-  });
 };
 
 const handleSelectProvinsi = async (selected: any) => {
@@ -242,45 +194,108 @@ const validateData = () => {
 
 const submitData = async () => {
   const error = validateData();
+
   if (error > 0) {
     alertStore.setAlert(
       "Terdapat beberapa kesalahan pada form. Silakan periksa kembali.",
-      "danger",
+      "danger"
     );
     return;
   }
 
+  
+  const harga =
+    produkStore.item.atributProduk?.find(
+      (a: any) => a.id === form.value.idAtributProduk
+    )?.harga || 0;
+
+  // ============================
+  // META InitiateCheckout
+  // ============================
+  if (
+    !produkStore.item?.embededCheckoutScript &&
+    typeof window !== "undefined" &&
+    window.fbq &&
+    !window.__checkoutTracked
+  ) {
+    window.__checkoutTracked = true;
+
+    window.fbq("track", "InitiateCheckout", {
+      content_ids: [form.value.idProduk],
+      content_name: produkStore.item.namaProduk,
+      currency: "IDR",
+      value: harga,
+    });
+  }
+
+  // ============================
+  // GTM begin_checkout
+  // ============================
+  if (typeof window !== "undefined" && window.dataLayer) {
+    window.dataLayer.push({
+      event: "begin_checkout",
+      ecommerce: {
+        currency: "IDR",
+        value: harga,
+        items: [
+          {
+            item_id: form.value.idProduk,
+            item_name: produkStore.item.namaProduk,
+            price: harga,
+          },
+        ],
+      },
+    });
+  }
+
+  // ============================
+  // STORE ORDER
+  // ============================
   loading.value = true;
+
   const payload = { ...form.value };
+
   if (payload.nomorWhatsapp) {
     payload.nomorWhatsapp = payload.nomorWhatsapp.replace(/\D/g, "");
   }
 
   const res = await pesananStore.onStore(payload);
+
   if (res.success) {
     navigateTo(`/${route.params.slug}/success`);
   }
+
   loading.value = false;
 };
 
 const handleAbandon = () => {
   if (pesananStore.isSubmitted || isAbandonSubmitted.value) return;
+
   isAbandonSubmitted.value = true;
 
-  const payload = { ...form.value, source: "ABANDON" };
+  const payload = {
+    ...form.value,
+    source: "ABANDON",
+  };
+
   if (payload.nomorWhatsapp) {
     payload.nomorWhatsapp = payload.nomorWhatsapp.replace(/\D/g, "");
   }
 
-  fetch(`${config.public.api_url}order/create`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(payload),
-    keepalive: true,
+  const url = `${config.public.api_url}order/create`;
+
+  // sendBeacon butuh Blob atau FormData
+  const blob = new Blob([JSON.stringify(payload)], {
+    type: "application/json",
   });
+
+  navigator.sendBeacon(url, blob);
+};
+
+const onVisibilityChange = () => {
+  if (document.visibilityState === "hidden") {
+    handleAbandon();
+  }
 };
 
 const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
@@ -290,15 +305,187 @@ const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
   }
 };
 
-onMounted(() => {
-  getProduk();
-  locationStore.onIndexProvince();
+// ===== SSR DATA FETCH =====
+await useAsyncData("checkout-data", async () => {
+  await Promise.all([
+    produkStore.onCheckout(slug),
+    locationStore.onIndexProvince(),
+  ]);
 
+  mappingData();
+  return true;
+});
+
+// ===== HEAD TRACKING =====
+useHead(() => {
+  const pixelId = produkStore.item?.idFacebookPixelId?.trim();
+  const gtmId = produkStore.item?.idGoogleGtmId?.trim();
+  const embedded = produkStore.item?.embededCheckoutScript;
+  const namaProduk = produkStore.item?.namaProduk?.trim()
+
+  const title = namaProduk
+    ? `${namaProduk} | Checkout Resmi`
+    : "Checkout Produk"
+
+  const description =
+    "Selesaikan pembelian produk dengan cepat, aman, dan praktis melalui halaman checkout resmi kami."
+
+  const isValidPixel = /^\d+$/.test(pixelId || "");
+  const isValidGtm = /^GTM-/.test(gtmId || "");
+
+  const scripts: any[] = [];
+  const noscripts: any[] = [];
+
+  // ==========================
+  // META PIXEL
+  // ==========================
+  if (isValidPixel) {
+    scripts.push({
+      key: "fb-pixel",
+      tagPosition: "head",
+      innerHTML: `
+        !function(f,b,e,v,n,t,s)
+        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+        n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t,s)}(window, document,'script',
+        'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', '${pixelId}');
+        fbq('track', 'PageView');
+      `,
+    });
+
+    noscripts.push({
+      key: "fb-noscript",
+      tagPosition: "bodyOpen",
+      innerHTML: `
+        <img height="1" width="1" style="display:none"
+        src="https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1"/>
+      `,
+    });
+  }
+
+  // ==========================
+  // GTM
+  // ==========================
+  if (isValidGtm) {
+    scripts.push({
+      key: "gtm-script",
+      tagPosition: "head",
+      innerHTML: `
+        (function(w,d,s,l,i){w[l]=w[l]||[];
+        w[l].push({'gtm.start': new Date().getTime(),event:'gtm.js'});
+        var f=d.getElementsByTagName(s)[0],
+        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';
+        j.async=true;
+        j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;
+        f.parentNode.insertBefore(j,f);
+        })(window,document,'script','dataLayer','${gtmId}');
+      `,
+    });
+
+    noscripts.push({
+      key: "gtm-noscript",
+      tagPosition: "bodyOpen",
+      innerHTML: `
+        <iframe src="https://www.googletagmanager.com/ns.html?id=${gtmId}"
+        height="0" width="0" style="display:none;visibility:hidden"></iframe>
+      `,
+    });
+  }
+
+  // ==========================
+  // EMBEDDED SCRIPT (Client Custom)
+  // ==========================
+  if (embedded) {
+    scripts.push({
+      key: "custom-script",
+      tagPosition: "head",
+      innerHTML: embedded,
+    });
+  }
+
+  return {
+    title,
+    meta: [
+  {
+    key: "description",
+    name: "description",
+    content: description,
+  },
+  {
+    key: "og:title",
+    property: "og:title",
+    content: title,
+  },
+  {
+    key: "robots",
+    name: "robots",
+    content: "noindex, nofollow",
+  },
+  {
+    key: "og:description",
+    property: "og:description",
+    content: description,
+  },
+  {
+    key: "og:type",
+    property: "og:type",
+    content: "website",
+  },
+],
+    script: scripts,
+    noscript: noscripts,
+  };
+});
+
+onMounted(() => {
+  const harga =
+    produkStore.item?.atributProduk?.find(
+      (a: any) => a.id === form.value.idAtributProduk
+    )?.harga || 0;
+
+  // META
+  if (
+    !produkStore.item?.embededCheckoutScript &&
+    typeof window !== "undefined" &&
+    window.fbq
+  ) {
+    fbq("track", "ViewContent", {
+      content_ids: [produkStore.item.id],
+      content_name: produkStore.item.namaProduk,
+      currency: "IDR",
+      value: harga,
+    });
+  }
+
+  // GTM
+  if (typeof window !== "undefined" && window.dataLayer) {
+    window.dataLayer.push({
+      event: "view_content",
+      ecommerce: {
+        currency: "IDR",
+        value: harga,
+        items: [
+          {
+            item_id: produkStore.item.id,
+            item_name: produkStore.item.namaProduk,
+            price: harga,
+          },
+        ],
+      },
+    });
+  }
+
+  document.addEventListener("visibilitychange", onVisibilityChange);
   window.addEventListener("beforeunload", beforeUnloadHandler);
   window.addEventListener("pagehide", handleAbandon);
 });
 
 onBeforeUnmount(() => {
+  document.removeEventListener("visibilitychange", onVisibilityChange);
   window.removeEventListener("beforeunload", beforeUnloadHandler);
   window.removeEventListener("pagehide", handleAbandon);
 });
@@ -316,31 +503,7 @@ onBeforeUnmount(() => {
       class="product-img"
     />
     <section class="product-detail">
-      <h2
-        class="ff-poppins product-price"
-        v-if="
-          produkStore.item.atributProduk &&
-          produkStore.item.atributProduk.length > 0
-        "
-      >
-        {{ setMoneyDelimiter(produkStore.item.atributProduk[0].harga) }}
-      </h2>
-      <h3 class="ff-open-sans product-name">
-        {{ produkStore.item.namaProduk }}
-      </h3>
-      <div class="border-1-top-solid-primary product-feature">
-        <p class="title ff-open-sans">Yang Anda Dapatkan</p>
-        <div class="features">
-          <div
-            v-for="(feature, index) in produkStore.item.poinFitur"
-            :key="'feature-' + index"
-            :id="'feature-' + index"
-            class="feature ff-open-sans"
-          >
-            <check /> {{ feature }}
-          </div>
-        </div>
-      </div>
+      
     </section>
     <section class="product-option">
       <p class="title ff-open-sans">Pilihan Produk</p>
@@ -392,7 +555,7 @@ onBeforeUnmount(() => {
             field-name="nomor-whatsapp"
             required
             v-model="form.nomorWhatsapp"
-            mask="+62 #### #### ####"
+            mask="+62 #### #### #### ####"
             placeholder="+62 xxxx xxxx xxxx"
             :message-type="info.nomorWhatsapp.type"
             :message="info.nomorWhatsapp.message"
@@ -539,11 +702,12 @@ onBeforeUnmount(() => {
           :key="index"
         >
           <img
-            v-if="testimoni.urlGambar"
-            :src="testimoni.urlGambar"
-            alt="reviewer"
-            class="reviewer-picture"
-          />
+  v-if="testimoni.urlGambar"
+  :src="testimoni.urlGambar"
+  width="80"
+  height="80"
+  loading="lazy"
+/>
           <div class="review-content">
             <div class="reviewer-info">
               <p class="name ff-open-sans">
@@ -558,3 +722,10 @@ onBeforeUnmount(() => {
     </section>
   </NuxtLayout>
 </template>
+
+<style scoped>
+.product-img {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+}
+</style>
