@@ -27,6 +27,8 @@ interface propsInterface {
   customClass?: string;
   fieldId?: string;
   fieldName?: string;
+  /** Diteruskan ke InputCustom di dalamnya — lihat catatan di sana. */
+  labelHidden?: boolean;
 }
 const props = withDefaults(defineProps<propsInterface>(), {
   roValue: "",
@@ -46,6 +48,7 @@ const props = withDefaults(defineProps<propsInterface>(), {
   list: () => [],
   fieldId: "",
   fieldName: "",
+  labelHidden: false,
 });
 
 const emits = defineEmits([
@@ -130,6 +133,7 @@ watch(
     :message="message"
     :message-type="messageType"
     :label="label"
+    :label-hidden="labelHidden"
     :loading="loading"
     :required="required"
     :field-id="fieldId"
@@ -147,7 +151,7 @@ watch(
     <div
       v-if="showDropdown"
       class="dropdown-custom"
-      :style="label ? 'margin-top: 4rem' : ''"
+      :style="label && !labelHidden ? 'margin-top: 4rem' : ''"
       @mouseleave="showDropdown = false"
     >
       <div v-if="filterredList.length === 0" class="no-data">

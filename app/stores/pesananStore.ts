@@ -1,7 +1,15 @@
 import { defineStore } from "pinia";
-import { postData, errorHelper } from "~/apiConfigs/method";
+import { postData } from "~/apiConfigs/method";
+import type { ApiFieldError } from "~/types/formConfig";
 
 const prefix = "order";
+
+export interface CreateOrderResult {
+  success: boolean;
+  message: string;
+  /** Daftar galat per field — berada pada atribut `data`, bukan `errors`. */
+  errors: ApiFieldError[];
+}
 
 export const usePesananStore = defineStore("pesananStore", {
   state: () => ({
@@ -10,7 +18,7 @@ export const usePesananStore = defineStore("pesananStore", {
     message: "",
   }),
   actions: {
-    async onStore(data: any) {
+    async onStore(data: any): Promise<CreateOrderResult> {
       try {
         const response: any = await postData(
           "api_url",
@@ -21,9 +29,16 @@ export const usePesananStore = defineStore("pesananStore", {
         this.phoneNumber = response.data.data.phoneNumber;
         this.message = response.data.data.message;
 
-        return response.data;
+        return { success: true, message: response.data.message, errors: [] };
       } catch (error: any) {
-        errorHelper(error);
+        const body = error?.response?.data;
+        return {
+          success: false,
+          message: body?.message || "Jaringan Bermasalah",
+          // Galat validasi dipetakan ke masing-masing input oleh pemanggil;
+          // toast hanya untuk galat yang tidak terpetakan.
+          errors: Array.isArray(body?.data) ? body.data : [],
+        };
       }
     },
   },

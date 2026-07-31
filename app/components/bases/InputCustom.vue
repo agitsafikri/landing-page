@@ -21,9 +21,15 @@ interface propsInterface {
   fieldId?: string;
   fieldName?: string;
   mask?: string | object;
+  /**
+   * Sembunyikan label secara visual, TETAPI biarkan tetap terbaca pembaca layar.
+   * Bukan `v-if` maupun `display:none` — menghapus label dari pohon aksesibilitas
+   * membuat form tidak dapat diisi pengguna tunanetra (TDD produk-display-config §5.1).
+   */
+  labelHidden?: boolean;
 }
 
-withDefaults(defineProps<propsInterface>(), {
+const props = withDefaults(defineProps<propsInterface>(), {
   type: "text",
   error: false,
   withMessage: true,
@@ -35,6 +41,7 @@ withDefaults(defineProps<propsInterface>(), {
   fieldId: "",
   fieldName: "",
   mask: "",
+  labelHidden: false,
 });
 
 const emits = defineEmits([
@@ -94,12 +101,23 @@ function onKeydownTab(e: any) {
 function onClick(e: any) {
   emits("click", e);
 }
+
+// Aksesibilitas: field wajib dan galat harus terbaca screen reader, bukan hanya
+// ditandai `*` dan warna (TDD produk-form-config §20.4).
+const hasError = computed(() => props.error || props.messageType === "error");
+const messageId = computed(() =>
+  props.fieldId ? `${props.fieldId}-message` : undefined,
+);
+const describedBy = computed(() =>
+  props.withMessage && props.message ? messageId.value : undefined,
+);
 </script>
 
 <template>
   <div class="input-group">
-    <label v-if="label" :for="fieldId">
-      {{ label }} <span class="danger" v-if="required">*</span>
+    <label v-if="label" :for="fieldId" :class="{ 'sr-only': labelHidden }">
+      {{ label }}
+      <span class="danger" v-if="required" aria-hidden="true">*</span>
     </label>
     <div class="field">
       <div class="skeleton w-min-150 w-p-100 h-34" v-if="loading" />
@@ -118,6 +136,9 @@ function onClick(e: any) {
         :required="required"
         :id="fieldId"
         :fieldName="fieldName"
+        :aria-required="required || undefined"
+        :aria-invalid="hasError || undefined"
+        :aria-describedby="describedBy"
         @input="
           onChange({
             target: { value: ($event.target as HTMLInputElement).value },
@@ -141,6 +162,7 @@ function onClick(e: any) {
       <slot name="suffix-icon" class="suffix-icon" v-if="!loading" />
     </div>
     <span
+      :id="messageId"
       class="message"
       :class="{
         danger: messageType === 'error',
@@ -153,3 +175,19 @@ function onClick(e: any) {
     <slot />
   </div>
 </template>
+
+<style scoped>
+/* Terlihat oleh pembaca layar, tidak oleh mata. Ditaruh di komponen, bukan di
+   assets/styles, karena SCSS landing page berada di submodule repo terpisah. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+</style>

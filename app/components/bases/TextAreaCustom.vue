@@ -17,6 +17,8 @@ interface propsInterface {
   customClass?: string;
   fieldId?: string;
   fieldName?: string;
+  /** Sembunyikan label secara visual saja — lihat catatan di InputCustom. */
+  labelHidden?: boolean;
 }
 
 const prop = withDefaults(defineProps<propsInterface>(), {
@@ -25,6 +27,7 @@ const prop = withDefaults(defineProps<propsInterface>(), {
   errorMsg: "Tidak boleh kosong",
   withMessage: true,
   loading: false,
+  labelHidden: false,
 });
 
 const emits = defineEmits([
@@ -83,12 +86,22 @@ function onKeydownTab(e: any) {
 function onClick(e: any) {
   emits("click", e);
 }
+
+// Aksesibilitas: sejajar dengan InputCustom (TDD produk-form-config §20.4).
+const hasError = computed(() => prop.error || prop.messageType === "error");
+const messageId = computed(() =>
+  prop.fieldId ? `${prop.fieldId}-message` : undefined,
+);
+const describedBy = computed(() =>
+  prop.withMessage && prop.message ? messageId.value : undefined,
+);
 </script>
 
 <template>
   <div class="input-group">
-    <label v-if="label" :for="fieldId">
-      {{ label }} <span class="danger" v-if="required">*</span>
+    <label v-if="label" :for="fieldId" :class="{ 'sr-only': labelHidden }">
+      {{ label }}
+      <span class="danger" v-if="required" aria-hidden="true">*</span>
     </label>
     <div class="field">
       <div class="skeleton w-min-150 w-p-100 h-34" v-if="loading" />
@@ -103,6 +116,10 @@ function onClick(e: any) {
         :placeholder="placeholder"
         :disabled="disabled"
         :readonly="readonly"
+        :required="required"
+        :aria-required="required || undefined"
+        :aria-invalid="hasError || undefined"
+        :aria-describedby="describedBy"
         @input="
           onChange({
             target: { value: ($event.target as HTMLInputElement).value },
@@ -123,6 +140,7 @@ function onClick(e: any) {
       />
     </div>
     <span
+      :id="messageId"
       class="message"
       :class="{
         danger: messageType === 'error',
@@ -134,3 +152,18 @@ function onClick(e: any) {
     </span>
   </div>
 </template>
+
+<style scoped>
+/* Terlihat oleh pembaca layar, tidak oleh mata — lihat catatan di InputCustom. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+</style>

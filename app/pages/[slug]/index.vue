@@ -1,9 +1,18 @@
 <script setup lang="ts">
-import Check from "vue-material-design-icons/Check.vue";
 import bankTransferIcon from "~/assets/images/bank-transfer-icon.png";
 import codIcon from "~/assets/images/cod-icon.png";
 import { setDelimiter, setMoneyDelimiter } from "~/functions/delimiter";
-import { validateForm } from "~/functions/formHelper";
+import {
+  applyApiErrors,
+  buildOrderPayload,
+  firstErrorKeyInOrder,
+  hasErrorCode,
+  initFormInfo,
+  initFormValues,
+  scrollToField,
+  validateCheckoutForm,
+} from "~/functions/formConfig";
+import type { FieldInfo } from "~/types/formConfig";
 import { useProdukStore } from "~/stores/produkStore";
 
 const route = useRoute();
@@ -22,33 +31,55 @@ const isPesanTambahan = ref(false);
 const countdownConfig = ref<any>(null);
 const flashSaleConfig = ref<any>(null);
 const pesanTambahanConfig = ref<any>(null);
-const roValueProvinsi = ref<any>(null);
-const roValueKota = ref<any>(null);
-const roValueKecamatan = ref<any>(null);
 const loading = ref(false);
-const form = ref({
+const dynamicFormRef = ref<any>(null);
+
+/** Atribut pesanan yang bukan bagian formConfig. `source` ditentukan per jalur kirim. */
+const order = ref({
   idProduk: "",
   idAtributProduk: "",
-  namaLengkap: "",
-  nomorWhatsapp: "",
-  alamat: "",
-  idProvinsi: null,
-  idKota: null,
-  idKecamatan: null,
   metodePembayaran: "",
-  source: "FORM",
 });
-const info = ref({
-  namaLengkap: { type: "info", message: "" },
-  nomorWhatsapp: { type: "info", message: "" },
-  alamat: { type: "info", message: "" },
-  idProvinsi: { type: "info", message: "" },
-  idKota: { type: "info", message: "" },
-  idKecamatan: { type: "info", message: "" },
-  idProduk: { type: "info", message: "" },
-  idAtributProduk: { type: "info", message: "" },
-  metodePembayaran: { type: "info", message: "" },
-});
+
+/** Nilai & pesan galat per fieldKey — dibangun dari formConfig, bukan hardcode. */
+const values = ref<Record<string, any>>({});
+const info = ref<Record<string, FieldInfo>>({});
+
+/** Galat tingkat form dari backend (§18.4). */
+const formError = ref("");
+/** Dua kontrol di luar formConfig memakai pesan galatnya sendiri. */
+const optionError = ref("");
+const paymentError = ref("");
+
+const fields = computed(() => produkStore.formConfig);
+
+/**
+ * Setelan `hidePrice` menyembunyikan harga produk yang tampil di atas nama
+ * produk, di dalam `<section class="product-detail">`.
+ *
+ * Seksi tersebut saat ini kosong: isinya (harga, nama produk, dan daftar "Yang
+ * Anda Dapatkan") dihapus pada commit 8a9ce7d "fix : content rendering".
+ * Selama blok itu belum dipulihkan, tidak ada elemen harga untuk disembunyikan
+ * di halaman ini — nilainya tersedia lewat `produkStore.hidePrice` begitu blok
+ * tersebut kembali. Harga per varian pada daftar Pilihan Produk **tetap tampil**;
+ * bukan sasaran setelan ini.
+ */
+
+/**
+ * Form tidak dapat dirender tanpa konfigurasi. Merender form kosong akan
+ * menghasilkan payload tanpa data penerima dan 400 yang tidak dapat
+ * diperbaiki pelanggan (§18.6).
+ */
+const isConfigUnavailable = computed(
+  () => !produkStore.loading && fields.value.length === 0,
+);
+
+const hargaTerpilih = computed(
+  () =>
+    produkStore.item?.atributProduk?.find(
+      (a: any) => a.id === order.value.idAtributProduk,
+    )?.harga || 0,
+);
 
 const startCountdown = () => {
   let jam = countdownConfig.value.config.jam;
@@ -74,140 +105,111 @@ const startCountdown = () => {
   }, 1000);
 };
 
-const mappingData = () => {
-  let item = produkStore.item;
-  if (!item || !item.ekstra) return;
+/**
+ * Menyiapkan state form dari konfigurasi. `previous` dipakai saat konfigurasi
+ * dimuat ulang agar isian pelanggan tidak hilang (§18.5, §18.6).
+ */
+const initFormState = (previous?: Record<string, any>) => {
+  const next = initFormValues(fields.value);
 
-  isCountdown.value = item.ekstra.some(
-    (item: any) => item.type === "Countdown",
-  );
-  isPesanTambahan.value = item.ekstra.some(
-    (item: any) => item.type === "Pesan Tambahan",
-  );
-  isFlashSale.value = item.ekstra.some(
-    (item: any) => item.type === "Flash Sale",
-  );
+  if (previous) {
+    for (const key of Object.keys(next)) {
+      if (key in previous) next[key] = previous[key];
+    }
+  }
 
-  countdownConfig.value = item.ekstra.find(
-    (item: any) => item.type === "Countdown",
-  );
-  flashSaleConfig.value = item.ekstra.find(
-    (item: any) => item.type === "Flash Sale",
-  );
-  pesanTambahanConfig.value = item.ekstra.find(
-    (item: any) => item.type === "Pesan Tambahan",
-  );
+  values.value = next;
+  info.value = initFormInfo(fields.value);
+  formError.value = "";
+  optionError.value = "";
+  paymentError.value = "";
+};
 
-  isCOD.value = item.metodePembayaran.includes("COD");
-  isBankTransfer.value = item.metodePembayaran.includes("Bank Transfer");
+const mappingData = (previous?: Record<string, any>) => {
+  const item = produkStore.item;
+  if (!item || !item.id) return;
 
-  if (process.client && isCountdown.value) {
-  startCountdown();
-}
-
-  form.value.idProduk = item.id;
+  order.value.idProduk = item.id;
 
   if (item.atributProduk && item.atributProduk.length > 0) {
-    form.value.idAtributProduk = item.atributProduk[0].id;
+    order.value.idAtributProduk = item.atributProduk[0].id;
   }
 
-  if (item.metodePembayaran && item.metodePembayaran.length > 0) {
-    form.value.metodePembayaran = item.metodePembayaran[0];
+  const pembayaran: string[] = item.metodePembayaran ?? [];
+  isCOD.value = pembayaran.includes("COD");
+  isBankTransfer.value = pembayaran.includes("Bank Transfer");
+  order.value.metodePembayaran = pembayaran[0] ?? "";
+
+  initFormState(previous);
+
+  // Seksi `ekstra` bersifat opsional — produk tanpa ekstra tetap harus dapat
+  // dipesan, jadi bagian ini tidak boleh menghentikan inisialisasi di atas.
+  if (!Array.isArray(item.ekstra)) return;
+
+  isCountdown.value = item.ekstra.some((e: any) => e.type === "Countdown");
+  isPesanTambahan.value = item.ekstra.some(
+    (e: any) => e.type === "Pesan Tambahan",
+  );
+  isFlashSale.value = item.ekstra.some((e: any) => e.type === "Flash Sale");
+
+  countdownConfig.value = item.ekstra.find((e: any) => e.type === "Countdown");
+  flashSaleConfig.value = item.ekstra.find((e: any) => e.type === "Flash Sale");
+  pesanTambahanConfig.value = item.ekstra.find(
+    (e: any) => e.type === "Pesan Tambahan",
+  );
+
+  if (import.meta.client && isCountdown.value) {
+    startCountdown();
   }
-};
-
-const handleSelectProvinsi = async (selected: any) => {
-  roValueProvinsi.value = selected.name;
-  form.value.idProvinsi = selected.value;
-  roValueKota.value = "";
-  form.value.idKota = null;
-  roValueKecamatan.value = "";
-  form.value.idKecamatan = null;
-  await locationStore.onIndexCity(selected.value);
-};
-
-const handleSelectKota = async (selected: any) => {
-  roValueKota.value = selected.name;
-  form.value.idKota = selected.value;
-  roValueKecamatan.value = "";
-  form.value.idKecamatan = null;
-  await locationStore.onIndexDistrict(selected.value);
-};
-
-const handleSelectKecamatan = async (selected: any) => {
-  roValueKecamatan.value = selected.name;
-  form.value.idKecamatan = selected.value;
 };
 
 const handleSelectOption = (selected: any) => {
-  form.value.idAtributProduk = selected.id;
+  order.value.idAtributProduk = selected.id;
 };
 
-const handleSelectPaymentMethod = (selected: any) => {
-  form.value.metodePembayaran = selected;
+/** Memuat ulang konfigurasi — tombol "Muat ulang" dan pemulihan VALUE_NOT_IN_OPTIONS. */
+const reloadCheckout = async (keepValues = false) => {
+  const previous = keepValues ? { ...values.value } : undefined;
+  await produkStore.onCheckout(slug);
+  mappingData(previous);
+  await nextTick();
+  dynamicFormRef.value?.syncDisplayValues();
 };
 
 const validateData = () => {
-  let err = 0;
-  const validation = {
-    namaLengkap: {
-      label: "Nama",
-      required: true,
-    },
-    nomorWhatsapp: {
-      label: "Nomor Handphone",
-      required: true,
-    },
-    alamat: {
-      label: "Alamat",
-      required: true,
-    },
-    idProvinsi: {
-      label: "Provinsi",
-      required: true,
-    },
-    idKota: {
-      label: "Kota",
-      required: true,
-    },
-    idKecamatan: {
-      label: "Kecamatan",
-      required: true,
-    },
-    idProduk: {
-      label: "Produk",
-      required: true,
-    },
-    idAtributProduk: {
-      label: "Pilihan Produk",
-      required: true,
-    },
-    metodePembayaran: {
-      label: "Metode Pembayaran",
-      required: true,
-    },
-  };
+  let error = validateCheckoutForm(fields.value, values.value, info.value);
 
-  err += validateForm(validation, form.value, info.value);
-  return err;
+  optionError.value = "";
+  paymentError.value = "";
+
+  if (!order.value.idAtributProduk) {
+    optionError.value = "Pilihan Produk tidak boleh kosong";
+    error++;
+  }
+  if (!order.value.metodePembayaran) {
+    paymentError.value = "Metode Pembayaran tidak boleh kosong";
+    error++;
+  }
+
+  return error;
 };
 
 const submitData = async () => {
+  if (loading.value) return; // penjaga submit ganda selain tombol yang dinonaktifkan
+
+  formError.value = "";
   const error = validateData();
 
   if (error > 0) {
     alertStore.setAlert(
       "Terdapat beberapa kesalahan pada form. Silakan periksa kembali.",
-      "danger"
+      "danger",
     );
+    scrollToField(firstErrorKeyInOrder(fields.value, info.value));
     return;
   }
 
-  
-  const harga =
-    produkStore.item.atributProduk?.find(
-      (a: any) => a.id === form.value.idAtributProduk
-    )?.harga || 0;
+  const harga = hargaTerpilih.value;
 
   // ============================
   // META InitiateCheckout
@@ -221,7 +223,7 @@ const submitData = async () => {
     window.__checkoutTracked = true;
 
     window.fbq("track", "InitiateCheckout", {
-      content_ids: [form.value.idProduk],
+      content_ids: [order.value.idProduk],
       content_name: produkStore.item.namaProduk,
       currency: "IDR",
       value: harga,
@@ -239,7 +241,7 @@ const submitData = async () => {
         value: harga,
         items: [
           {
-            item_id: form.value.idProduk,
+            item_id: order.value.idProduk,
             item_name: produkStore.item.namaProduk,
             price: harga,
           },
@@ -253,34 +255,58 @@ const submitData = async () => {
   // ============================
   loading.value = true;
 
-  const payload = { ...form.value };
-
-  if (payload.nomorWhatsapp) {
-    payload.nomorWhatsapp = payload.nomorWhatsapp.replace(/\D/g, "");
-  }
+  const payload = buildOrderPayload(fields.value, values.value, {
+    ...order.value,
+    source: "FORM",
+  });
 
   const res = await pesananStore.onStore(payload);
 
   if (res.success) {
     navigateTo(`/${route.params.slug}/success`);
+    loading.value = false;
+    return;
   }
+
+  // Pemulihan struktural lebih dahulu — keduanya membangun ulang state field
+  // dan akan menghapus tanda galat bila dijalankan sesudahnya (§18.5).
+  if (hasErrorCode(res.errors, "LOCATION_HIERARCHY_MISMATCH")) {
+    await dynamicFormRef.value?.resetLocationChain();
+  }
+  if (hasErrorCode(res.errors, "VALUE_NOT_IN_OPTIONS")) {
+    // Admin mengubah options setelah halaman termuat: muat ulang konfigurasi
+    // lalu minta pelanggan memilih ulang — jalur pemulihan, bukan kegagalan.
+    await reloadCheckout(true);
+  }
+
+  // Isian dipertahankan seluruhnya; tombol dapat ditekan ulang (§18.6).
+  const outcome = applyApiErrors(
+    res.errors,
+    fields.value,
+    info.value,
+    res.message,
+  );
+
+  formError.value = outcome.formError;
+  if (formError.value) alertStore.setAlert(formError.value, "danger");
+
+  scrollToField(
+    outcome.firstErrorKey || firstErrorKeyInOrder(fields.value, info.value),
+  );
 
   loading.value = false;
 };
 
 const handleAbandon = () => {
   if (pesananStore.isSubmitted || isAbandonSubmitted.value) return;
+  if (!fields.value.length) return;
 
   isAbandonSubmitted.value = true;
 
-  const payload = {
-    ...form.value,
+  const payload = buildOrderPayload(fields.value, values.value, {
+    ...order.value,
     source: "ABANDON",
-  };
-
-  if (payload.nomorWhatsapp) {
-    payload.nomorWhatsapp = payload.nomorWhatsapp.replace(/\D/g, "");
-  }
+  });
 
   const url = `${config.public.api_url}order/create`;
 
@@ -442,10 +468,7 @@ useHead(() => {
 });
 
 onMounted(() => {
-  const harga =
-    produkStore.item?.atributProduk?.find(
-      (a: any) => a.id === form.value.idAtributProduk
-    )?.harga || 0;
+  const harga = hargaTerpilih.value;
 
   // META
   if (
@@ -503,116 +526,68 @@ onBeforeUnmount(() => {
       class="product-img"
     />
     <section class="product-detail">
-      
+
     </section>
     <section class="product-option">
       <p class="title ff-open-sans">Pilihan Produk</p>
       <div class="product-option-list">
+        <!-- Satu elemen per varian: pembungkus bersarang dengan kelas yang sama
+             membuat kotaknya ter-render dua kali. -->
         <div
           class="product-option-item"
           v-for="option in produkStore.item.atributProduk"
           :key="option.id"
           @click="handleSelectOption(option)"
         >
-          <div class="product-option-item">
-            <input
-              type="radio"
-              name="product-option"
-              :id="'option-' + option.id"
-              :value="option.id"
-              v-model="form.idAtributProduk"
-            />
-            <label :for="'option-' + option.id">
-              <span class="text">{{ option.deskripsi }}</span>
-              <span class="price">
-                {{ setMoneyDelimiter(option.harga) }}</span
-              ></label
-            >
-          </div>
+          <input
+            type="radio"
+            name="product-option"
+            :id="'option-' + option.id"
+            :value="option.id"
+            v-model="order.idAtributProduk"
+          />
+          <label :for="'option-' + option.id">
+            <span class="text">{{ option.deskripsi }}</span>
+            <span class="price">
+              {{ setMoneyDelimiter(option.harga) }}</span
+            ></label
+          >
         </div>
       </div>
-      <span class="message danger fz-em-07 m-4-top">{{
-        info.idAtributProduk.message
-      }}</span>
+      <span class="message danger fz-em-07 m-4-top">{{ optionError }}</span>
     </section>
     <section class="recipient">
       <p class="title ff-open-sans">Data Penerima</p>
-      <div class="receipent-form">
+
+      <!-- Konfigurasi gagal dimuat: jangan merender form kosong (§18.6). -->
+      <div v-if="isConfigUnavailable" class="text-align-center">
+        <p class="message danger fz-em-07">
+          {{
+            produkStore.error ||
+            "Form pemesanan belum tersedia untuk produk ini."
+          }}
+        </p>
+        <BasesButtonCustom
+          class="btn-primary m-8-top"
+          :loading="produkStore.loading"
+          @click="reloadCheckout()"
+        >
+          Muat ulang
+        </BasesButtonCustom>
+      </div>
+
+      <div v-else class="receipent-form">
         <div class="receipent-form-item">
-          <BasesInputCustom
-            label="Nama Lengkap"
-            field-id="nama-lengkap"
-            field-name="nama-lengkap"
-            required
-            v-model="form.namaLengkap"
-            placeholder="Nama Lengkap"
-            :message-type="info.namaLengkap.type"
-            :message="info.namaLengkap.message"
-          />
-          <BasesInputCustom
-            label="Nomor Whatsapp"
-            field-id="nomor-whatsapp"
-            field-name="nomor-whatsapp"
-            required
-            v-model="form.nomorWhatsapp"
-            mask="+62 #### #### #### ####"
-            placeholder="+62 xxxx xxxx xxxx"
-            :message-type="info.nomorWhatsapp.type"
-            :message="info.nomorWhatsapp.message"
-          />
-          <BasesTextAreaCustom
-            label="Alamat Lengkap"
-            field-id="alamat-lengkap"
-            field-name="alamat-lengkap"
-            required
-            v-model="form.alamat"
-            placeholder="Alamat Lengkap"
-            :message-type="info.alamat.type"
-            :message="info.alamat.message"
-          />
-          <BasesSelectCustom
-            label="Provinsi"
-            field-id="provinsi"
-            field-name="provinsi"
-            required
-            placeholder="Pilih Provinsi"
-            :selected="form.idProvinsi"
-            :ro-value="roValueProvinsi"
-            :list="locationStore.provinces"
-            @select="handleSelectProvinsi"
-            :message-type="info.idProvinsi.type"
-            :message="info.idProvinsi.message"
-          />
-          <BasesSelectCustom
-            label="Kota"
-            field-id="kota"
-            field-name="kota"
-            required
-            placeholder="Pilih Kota"
-            :selected="form.idKota"
-            :ro-value="roValueKota"
-            :list="locationStore.cities"
-            :disabled="!form.idProvinsi"
-            @select="handleSelectKota"
-            :message-type="info.idKota.type"
-            :message="info.idKota.message"
-          />
-          <BasesSelectCustom
-            label="Kecamatan"
-            field-id="kecamatan"
-            field-name="kecamatan"
-            required
-            placeholder="Pilih Kecamatan"
-            :selected="form.idKecamatan"
-            :ro-value="roValueKecamatan"
-            :list="locationStore.districts"
-            :disabled="!form.idKota"
-            @select="handleSelectKecamatan"
-            :message-type="info.idKecamatan.type"
-            :message="info.idKecamatan.message"
+          <DynamicForm
+            ref="dynamicFormRef"
+            :fields="fields"
+            :values="values"
+            :info="info"
+            :label-hidden="produkStore.hideFormLabel"
           />
         </div>
       </div>
+
       <div class="payment-method">
         <p class="title ff-open-sans">Metode Pembayaran</p>
         <div class="payment-method-list" v-if="isCOD || isBankTransfer">
@@ -625,7 +600,7 @@ onBeforeUnmount(() => {
               name="payment-method"
               id="payment-method-1"
               value="COD"
-              v-model="form.metodePembayaran"
+              v-model="order.metodePembayaran"
             />
           </div>
           <div class="payment-method-item" v-if="isBankTransfer">
@@ -638,13 +613,11 @@ onBeforeUnmount(() => {
               name="payment-method"
               id="payment-method-2"
               value="Bank Transfer"
-              v-model="form.metodePembayaran"
+              v-model="order.metodePembayaran"
             />
           </div>
         </div>
-        <span class="message danger fz-em-07 m-4-top">{{
-          info.metodePembayaran.message
-        }}</span>
+        <span class="message danger fz-em-07 m-4-top">{{ paymentError }}</span>
       </div>
     </section>
     <section class="product-sale">
@@ -671,8 +644,13 @@ onBeforeUnmount(() => {
       </div>
     </section>
     <section class="action">
+      <p class="message danger fz-em-07 m-4-bottom" v-if="formError">
+        {{ formError }}
+      </p>
       <BasesButtonCustom
         class="action-btn btn-primary w-p-100 m-8-bottom"
+        :loading="loading"
+        :disabled="isConfigUnavailable"
         @click="submitData"
       >
         {{ produkStore.item.narasiTombol || "Beli Sekarang" }}
