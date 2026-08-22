@@ -43,6 +43,23 @@ const locationOptions = (type: FormFieldType): SelectOption[] => {
 const optionsFor = (field: FormFieldCheckout): SelectOption[] =>
   isLocationField(field.fieldType) ? locationOptions(field.fieldType) : [];
 
+/**
+ * Tipe field yang dirender sebagai combobox tercari.
+ *
+ * Syaratnya opsi sudah dimuat penuh, karena pencarian berjalan lokal. Ketiga
+ * tingkat lokasi memenuhinya: `location/*` mengembalikan satu daftar utuh per
+ * induk tanpa paginasi, dan `loadLocationLevel` menunggu daftar itu selesai
+ * sebelum tingkat tersebut dapat dibuka.
+ *
+ * Bila kelak ada tingkat lokasi yang dimuat bertahap/diambil per kata kunci,
+ * tingkat itu TIDAK boleh masuk daftar ini: penyaringan lokal atas daftar
+ * separuh akan menyembunyikan opsi yang sah dari pelanggan.
+ */
+const SEARCHABLE_TYPES: FormFieldType[] = ["PROVINCE", "CITY", "DISTRICT"];
+
+const isSearchable = (field: FormFieldCheckout) =>
+  SEARCHABLE_TYPES.includes(field.fieldType);
+
 /** Tingkat lokasi nonaktif hingga tingkat di atasnya terpilih (§16). */
 const isDisabled = (field: FormFieldCheckout): boolean => {
   if (!isLocationField(field.fieldType)) return false;
@@ -178,6 +195,7 @@ defineExpose({ resetLocationChain, syncDisplayValues });
     :info="info[field.fieldKey]"
     :options="optionsFor(field)"
     :ro-value="roValues[field.fieldKey] || ''"
+    :searchable="isSearchable(field)"
     :disabled="isDisabled(field)"
     :loading="loadingKeys[field.fieldKey] || false"
     :label-hidden="labelHidden"

@@ -22,6 +22,18 @@ interface propsInterface {
   fieldName?: string;
   mask?: string | object;
   /**
+   * Nilai atribut `autocomplete` browser. Field data penerima membiarkannya
+   * apa adanya — isi otomatis mempercepat checkout. Kontrol pencarian seperti
+   * combobox mengirim "off" supaya saran browser tidak menutupi dropdown.
+   */
+  autocomplete?: string;
+  /** Atribut ARIA yang dikelola komponen induk — mis. pola combobox. */
+  role?: string;
+  ariaExpanded?: boolean;
+  ariaControls?: string;
+  ariaActivedescendant?: string;
+  ariaAutocomplete?: string;
+  /**
    * Sembunyikan label secara visual, TETAPI biarkan tetap terbaca pembaca layar.
    * Bukan `v-if` maupun `display:none` — menghapus label dari pohon aksesibilitas
    * membuat form tidak dapat diisi pengguna tunanetra (TDD produk-display-config §5.1).
@@ -41,6 +53,7 @@ const props = withDefaults(defineProps<propsInterface>(), {
   fieldId: "",
   fieldName: "",
   mask: "",
+  autocomplete: "false",
   labelHidden: false,
 });
 
@@ -122,11 +135,11 @@ const describedBy = computed(() =>
     <div class="field">
       <div class="skeleton w-min-150 w-p-100 h-34" v-if="loading" />
       <input
-        :class="error && !disabled ? 'error' : '' + ' ' + customClass"
+        :class="[hasError && !disabled ? 'error' : '', customClass]"
         :maxlength="maxLength"
-        autocomplete="false"
+        :autocomplete="autocomplete"
         :type="type"
-        :value="modelValue ? modelValue : value"
+        :value="modelValue ?? value ?? ''"
         :name="label"
         :min="min"
         :max="max"
@@ -139,6 +152,13 @@ const describedBy = computed(() =>
         :aria-required="required || undefined"
         :aria-invalid="hasError || undefined"
         :aria-describedby="describedBy"
+        :role="role || undefined"
+        :aria-expanded="
+          ariaExpanded === undefined ? undefined : String(ariaExpanded)
+        "
+        :aria-controls="ariaControls || undefined"
+        :aria-activedescendant="ariaActivedescendant || undefined"
+        :aria-autocomplete="ariaAutocomplete || undefined"
         @input="
           onChange({
             target: { value: ($event.target as HTMLInputElement).value },
@@ -189,5 +209,17 @@ const describedBy = computed(() =>
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Kursor membedakan field yang dapat diketik dari yang hanya dapat diklik —
+   satu-satunya petunjuk bahwa combobox menerima pencarian sedangkan select
+   biasa tidak. Diteruskan lewat `customClass` oleh SelectCustom; hanya bisa
+   didefinisikan di sini karena CSS scoped tidak menjangkau input dari luar. */
+input.cursor-pointer {
+  cursor: pointer;
+}
+
+input.cursor-text {
+  cursor: text;
 }
 </style>

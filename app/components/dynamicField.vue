@@ -18,6 +18,11 @@ interface propsInterface {
   options?: SelectOption[];
   /** Teks yang tampil pada kontrol select (SelectCustom tidak memakai v-model). */
   roValue?: string;
+  /**
+   * Render select sebagai combobox yang dapat dicari. Hanya boleh aktif bila
+   * seluruh opsi sudah dimuat — penyaringan berjalan lokal (lihat SelectCustom).
+   */
+  searchable?: boolean;
   disabled?: boolean;
   loading?: boolean;
   /** Setelan produk `hideFormLabel` — label disembunyikan visual, bukan dihapus. */
@@ -26,6 +31,7 @@ interface propsInterface {
 
 const props = withDefaults(defineProps<propsInterface>(), {
   roValue: "",
+  searchable: false,
   disabled: false,
   loading: false,
   labelHidden: false,
@@ -88,6 +94,7 @@ const onBlur = () => emits("blur");
     :list="selectList"
     :selected="modelValue"
     :ro-value="roValue"
+    :is-combobox="searchable"
     :disabled="disabled"
     :loading="loading"
     :message="message"
