@@ -227,6 +227,49 @@ export const buildOrderPayload = (
   return payload;
 };
 
+/**
+ * Panjang minimum agar nama dianggap benar-benar diisi, bukan satu ketukan
+ * yang tertangkap saat pelanggan berpindah aplikasi.
+ */
+const MIN_ABANDON_NAME_LENGTH = 2;
+
+/**
+ * Digit minimum nomor WhatsApp. Tidak boleh diukur dengan "tidak kosong":
+ * `normalizePhone` menambahkan awalan 62, sehingga "08" yang baru separuh
+ * diketik menjadi "628" — terisi menurut `isBlank`, padahal tak berguna.
+ * Nomor Indonesia terpendek setelah normalisasi ada di kisaran 11 digit.
+ */
+const MIN_ABANDON_PHONE_DIGITS = 10;
+
+/**
+ * Apakah snapshot ABANDON layak direkam: nama dan nomor WhatsApp sudah terisi.
+ *
+ * Lead tanpa keduanya tidak dapat dihubungi, dan karena backend membuat record
+ * baru untuk setiap kiriman, snapshot di bawah ambang ini hanya menambah baris
+ * yang tidak bisa ditindaklanjuti.
+ *
+ * Diukur dari payload, bukan dari `values`, supaya pemetaan System Field dan
+ * normalisasi nomor ikut terhitung — payload itulah yang menjadi isi record.
+ * Nama atributnya diambil dari `SYSTEM_FIELD_PAYLOAD_MAP` agar pemetaan
+ * field_key → atribut tetap hanya dikenali di satu tempat.
+ */
+export const isAbandonWorthSending = (
+  payload: Record<string, any>,
+): boolean => {
+  const name = String(
+    payload[SYSTEM_FIELD_PAYLOAD_MAP.customer_name!] ?? "",
+  ).trim();
+
+  const phoneDigits = String(
+    payload[SYSTEM_FIELD_PAYLOAD_MAP.phone_number!] ?? "",
+  ).replace(/\D/g, "");
+
+  return (
+    name.length >= MIN_ABANDON_NAME_LENGTH &&
+    phoneDigits.length >= MIN_ABANDON_PHONE_DIGITS
+  );
+};
+
 export interface ApiErrorOutcome {
   /** Galat tingkat form — tidak terpetakan ke field mana pun. */
   formError: string;

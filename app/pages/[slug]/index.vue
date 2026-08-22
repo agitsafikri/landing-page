@@ -9,6 +9,7 @@ import {
   hasErrorCode,
   initFormInfo,
   initFormValues,
+  isAbandonWorthSending,
   scrollToField,
   validateCheckoutForm,
 } from "~/functions/formConfig";
@@ -22,7 +23,6 @@ const locationStore = useLocationStore();
 const pesananStore = usePesananStore();
 const alertStore = useAlertStore();
 const config = useRuntimeConfig();
-const isAbandonSubmitted = ref(false);
 const isCOD = ref(false);
 const isBankTransfer = ref(false);
 const isCountdown = ref(false);
@@ -297,30 +297,143 @@ const submitData = async () => {
   loading.value = false;
 };
 
-const handleAbandon = () => {
-  if (pesananStore.isSubmitted || isAbandonSubmitted.value) return;
-  if (!fields.value.length) return;
+/**
+ * Endpoint order/create untuk jalur beacon.
+ *
+ * Jalur FORM memakai axios dengan `baseURL`, yang menormalkan garis miring
+ * sendiri. Beacon menyusun URL-nya secara manual, jadi normalisasi dilakukan
+ * di sini: `VITE_APP_API_URL` tanpa garis miring penutup akan menghasilkan
+ * ".../api/v1order/create" dan mematikan HANYA jalur ABANDON — kegagalan
+ * senyap yang tidak terlihat dari checkout normal.
+ */
+const orderCreateUrl = computed(() => {
+  const base = String(config.public.api_url ?? "").replace(/\/+$/, "");
+  return `${base}/order/create`;
+});
 
-  isAbandonSubmitted.value = true;
-
-  const payload = buildOrderPayload(fields.value, values.value, {
+const buildAbandonPayload = () =>
+  buildOrderPayload(fields.value, values.value, {
     ...order.value,
     source: "ABANDON",
   });
 
-  const url = `${config.public.api_url}order/create`;
+/**
+ * Tanda tangan snapshot untuk membandingkan dua keadaan form. Urutan kunci
+ * `buildOrderPayload` deterministik, jadi stringify cukup — tidak perlu hash.
+ */
+const abandonSignature = (payload: Record<string, any>) =>
+  JSON.stringify(payload);
 
-  // sendBeacon butuh Blob atau FormData
-  const blob = new Blob([JSON.stringify(payload)], {
-    type: "application/json",
-  });
+/**
+ * Tanda tangan snapshot ABANDON terakhir yang sudah dikirim.
+ *
+ * Nilai awalnya adalah baseline — payload sesaat setelah konfigurasi termuat —
+ * supaya form yang belum disentuh tidak pernah terkirim. `mappingData` sudah
+ * mengisi metode pembayaran dan varian bawaan, dan `initFormValues` mengisi
+ * `defaultValue`, jadi "kosong" tidak bisa diukur dari isian yang kebetulan
+ * bernilai; yang menandai keterlibatan pelanggan adalah beda dari baseline.
+ *
+ * `null` berarti baseline belum diambil dan tidak ada yang boleh dikirim.
+ */
+const lastAbandonSignature = ref<string | null>(null);
 
-  navigator.sendBeacon(url, blob);
+/**
+ * Diambil sekali saja. Memperbaruinya setelah pelanggan mengisi akan membuat
+ * isian yang belum terkirim ikut terhitung "tidak berubah" dan hilang —
+ * termasuk sesudah `reloadCheckout(true)` yang mempertahankan isian.
+ */
+const captureAbandonBaseline = () => {
+  if (lastAbandonSignature.value !== null) return;
+  if (!fields.value.length) return;
+  lastAbandonSignature.value = abandonSignature(buildAbandonPayload());
+};
+
+/**
+ * Pengiriman yang harus selamat walau halaman sedang dibekukan atau dibuang.
+ *
+ * `sendBeacon` mengembalikan `false` bila kuota antrean beacon penuh atau
+ * API-nya tidak tersedia — dan karena fire-and-forget, kegagalan itu tidak
+ * terlihat di mana pun. `fetch` + `keepalive` memakai kuota terpisah sebagai
+ * jaring kedua. Mengembalikan false berarti snapshot belum terkirim, sehingga
+ * transisi hidden berikutnya mencobanya lagi.
+ */
+const postAbandonBeacon = (payload: Record<string, any>): boolean => {
+  const url = orderCreateUrl.value;
+  const body = JSON.stringify(payload);
+
+  if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+    // sendBeacon butuh Blob atau FormData
+    const blob = new Blob([body], { type: "application/json" });
+    if (navigator.sendBeacon(url, blob)) return true;
+  }
+
+  try {
+    // Hasilnya tidak dapat ditunggu — halaman mungkin sudah tidak ada saat
+    // respons datang. `keepalive` yang menjaga permintaan tetap jalan.
+    fetch(url, {
+      method: "POST",
+      body,
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      mode: "cors",
+    }).catch(() => {});
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Mengirim snapshot isian terakhir sebagai pesanan ABANDON.
+ *
+ * Dipanggil pada SETIAP transisi ke hidden, bukan sekali di akhir sesi. Di
+ * mobile tidak ada "akhir sesi" yang dapat diandalkan: menggeser browser dari
+ * daftar aplikasi atau OS mematikan prosesnya tidak memancarkan event apa pun
+ * — `pagehide` maupun `beforeunload` tidak menyala. Yang pasti menyala adalah
+ * transisi ke hidden, dan itu terjadi berkali-kali dalam satu sesi (pindah
+ * aplikasi, telepon masuk, layar terkunci). Karena itu setiap transisi
+ * mengirim snapshot terbaru; record terakhir yang masuk adalah isian terakhir.
+ *
+ * Konsekuensinya satu sesi dapat menghasilkan beberapa record ABANDON. Itu
+ * disengaja: backend membuat record baru per kiriman, dan menangkap isian
+ * terakhir lebih berharga daripada tabel yang rapi. Yang menahan jumlahnya
+ * tetap wajar adalah ambang `isAbandonWorthSending` — pengiriman baru mulai
+ * setelah nama dan nomor WhatsApp terisi, jadi perpindahan aplikasi di awal
+ * sesi (bagian terbanyak dari transisi hidden) tidak menghasilkan apa pun.
+ */
+const sendAbandonSnapshot = () => {
+  if (pesananStore.isSubmitted) return;
+  if (!fields.value.length) return;
+  // Baseline belum siap — konfigurasi gagal dimuat, tidak ada yang bermakna.
+  if (lastAbandonSignature.value === null) return;
+
+  const payload = buildAbandonPayload();
+
+  // Belum layak direkam — nama atau nomor WhatsApp belum terisi. Tanda tangan
+  // sengaja TIDAK diperbarui, supaya kiriman pertama tetap terjadi begitu
+  // ambangnya terlampaui.
+  if (!isAbandonWorthSending(payload)) return;
+
+  const signature = abandonSignature(payload);
+
+  // Sama dengan baseline berarti pelanggan belum menyentuh apa pun; sama
+  // dengan kiriman terakhir berarti tidak ada perubahan untuk direkam.
+  //
+  // Kedua gerbang inilah yang memperbaiki bug utamanya. Sebelumnya pengaman
+  // sekali-pakai langsung menyala pada transisi hidden PERTAMA — di mobile
+  // biasanya saat pelanggan pindah aplikasi untuk menyalin nomor atau
+  // alamatnya, jadi yang terkirim form kosong yang ditolak backend, dan
+  // kiriman sesungguhnya tidak pernah terjadi lagi.
+  if (signature === lastAbandonSignature.value) return;
+
+  if (!postAbandonBeacon(payload)) return;
+
+  lastAbandonSignature.value = signature;
 };
 
 const onVisibilityChange = () => {
   if (document.visibilityState === "hidden") {
-    handleAbandon();
+    sendAbandonSnapshot();
   }
 };
 
@@ -502,15 +615,24 @@ onMounted(() => {
     });
   }
 
+  // Baseline diambil di sini, bukan di dalam useAsyncData: `await` tingkat
+  // atas pada <script setup> membuat onMounted berjalan setelah data selesai,
+  // jadi fields dan values sudah terisi pada titik ini.
+  captureAbandonBaseline();
+
   document.addEventListener("visibilitychange", onVisibilityChange);
   window.addEventListener("beforeunload", beforeUnloadHandler);
-  window.addEventListener("pagehide", handleAbandon);
+  window.addEventListener("pagehide", sendAbandonSnapshot);
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener("visibilitychange", onVisibilityChange);
   window.removeEventListener("beforeunload", beforeUnloadHandler);
-  window.removeEventListener("pagehide", handleAbandon);
+  window.removeEventListener("pagehide", sendAbandonSnapshot);
+
+  // Pindah halaman di dalam SPA tidak memancarkan `pagehide`. Setelah kirim
+  // berhasil `isSubmitted` sudah true sehingga navigasi ke /success aman.
+  sendAbandonSnapshot();
 });
 </script>
 
